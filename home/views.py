@@ -19,13 +19,12 @@ def extract_audio(request):
         
         video_file = request.FILES['video']
         
-        # Handle MEDIA_ROOT configuration issues
-        if not hasattr(settings, 'MEDIA_ROOT') or not settings.MEDIA_ROOT:
-            # Fallback to BASE_DIR if MEDIA_ROOT not configured
+        # Handle MEDIA_ROOT configuration
+        media_root = getattr(settings, 'MEDIA_ROOT', None)
+        if not media_root:
+            # Default to BASE_DIR/media if not set
             media_root = os.path.join(settings.BASE_DIR, 'media')
             logger.warning(f"MEDIA_ROOT not set. Using fallback: {media_root}")
-        else:
-            media_root = settings.MEDIA_ROOT
         
         # Ensure media directories exist
         try:
@@ -70,11 +69,14 @@ def extract_audio(request):
         audio_path = os.path.join(audios_dir, audio_filename)
         relative_audio_path = f'audios/{audio_filename}'
         
-        # Extract audio using MoviePy
+        # Extract audio using MoviePy - FIXED VERSION
         try:
             logger.info(f"Starting audio extraction to: {audio_path}")
             clip = VideoFileClip(temp_video_path)
-            clip.audio.write_audiofile(audio_path, verbose=False, logger=None)
+            
+            # FIX: Use compatible parameters for write_audiofile
+            # Remove 'verbose' parameter which causes the error
+            clip.audio.write_audiofile(audio_path)
             clip.close()
             logger.info("Audio extraction completed successfully")
         except Exception as processing_error:

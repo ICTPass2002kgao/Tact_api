@@ -11,10 +11,26 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
+class SelfCleaningFileResponse(FileResponse):
+    """Custom response that deletes file after sending"""
+    def __init__(self, file_path, *args, **kwargs):
+        self.file_path = file_path
+        file = open(file_path, 'rb')
+        super().__init__(file, *args, **kwargs)
+    
+    def close(self):
+        super().close()
+        try:
+            if os.path.exists(self.file_path):
+                os.unlink(self.file_path)
+        except Exception as e:
+            logger.error(f"Cleanup error: {str(e)}")
+
 @api_view(['POST'])
 def extract_audio(request):
     temp_video_path = None
     temp_audio_path = None
+    persistent_audio_path = None
     
     try:
         # Validate video file exists
@@ -29,9 +45,8 @@ def extract_audio(request):
             for chunk in video_file.chunks():
                 temp_video.write(chunk)
         
-        # Create temporary audio file
-        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
-            temp_audio_path = temp_audio.name
+        # Create temporary audio file path
+        temp_audio_path = tempfile.mktemp(suffix='.mp3')
         
         # Convert to audio
         try:
@@ -45,29 +60,16 @@ def extract_audio(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
-        # Create a copy of the audio file to keep it open
-        persistent_audio_path = f"/tmp/audio_{uuid.uuid4()}.mp3"
+        # Create a persistent audio file
+        persistent_audio_path = tempfile.mktemp(suffix='.mp3')
         shutil.copyfile(temp_audio_path, persistent_audio_path)
         
-        # Prepare response with persistent file
-        audio_file = open(persistent_audio_path, 'rb')
-        response = FileResponse(
-            audio_file,
+        # Create custom response that auto-deletes file
+        return SelfCleaningFileResponse(
+            persistent_audio_path,
             filename=f"audio_{uuid.uuid4()}.mp3",
             content_type='audio/mpeg'
         )
-        
-        # Add cleanup callback
-        def cleanup():
-            try:
-                audio_file.close()
-                os.unlink(persistent_audio_path)
-            except Exception as e:
-                logger.error(f"Cleanup error: {str(e)}")
-                
-        response.closed.connect(cleanup)
-        
-        return response
         
     except Exception as e:
         logger.exception("Unhandled exception in extract_audio")
@@ -77,7 +79,9 @@ def extract_audio(request):
         )
     finally:
         # Clean up temporary files
-        if temp_video_path and os.path.exists(temp_video_path):
-            os.unlink(temp_video_path)
-        if temp_audio_path and os.path.exists(temp_audio_path):
-            os.unlink(temp_audio_path)
+        for path in [temp_video_path, temp_audio_path]:
+            if path and os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except Exception as e:
+                    logger.error(f"Error deleting temp file: {str(e)}")

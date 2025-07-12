@@ -13,25 +13,38 @@ from rest_framework import status
 def extract_audio(request):
     serializer = AudioSerializer(data=request.data)
     if serializer.is_valid():
-        video_file = request.FILES['video']
+        try:
+            video_file = request.FILES['video']
  
-        temp_video_path = os.path.join(settings.MEDIA_ROOT, f"temp_{uuid.uuid4()}.mp4")
-        with open(temp_video_path, 'wb+') as destination:
-            for chunk in video_file.chunks():
-                destination.write(chunk)
+            temp_video_path = os.path.join(
+                settings.MEDIA_ROOT, f"temp_{uuid.uuid4()}.mp4"
+            )
+            with open(temp_video_path, 'wb+') as destination:
+                for chunk in video_file.chunks():
+                    destination.write(chunk)
  
-        audio_filename = f"audio_{uuid.uuid4()}.mp3"
-        audio_path = os.path.join(settings.MEDIA_ROOT, 'audio', audio_filename)
+            audios_dir = os.path.join(settings.MEDIA_ROOT, 'audios')
+            os.makedirs(audios_dir, exist_ok=True)
+ 
+            audio_filename = f"audio_{uuid.uuid4()}.mp3"
+            audio_path = os.path.join(audios_dir, audio_filename)
+ 
+            clip = VideoFileClip(temp_video_path)
+            clip.audio.write_audiofile(audio_path)
+ 
+            os.remove(temp_video_path)
+ 
+            audio_record = Product.objects.create(audio=f'audios/{audio_filename}')
+ 
+            return Response(
+                {'audio': audio_record.audio.url},
+                status=status.HTTP_201_CREATED
+            )
 
-        clip = VideoFileClip(temp_video_path)
-        clip.audio.write_audiofile(audio_path)
- 
-        os.remove(temp_video_path)
- 
-        audio_record = Product.objects.create(audio=f'audio/{audio_filename}')
-
-        return Response({
-            'audio': audio_record.audio.url
-        }, status=status.HTTP_201_CREATED)
+        except Exception as e: 
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

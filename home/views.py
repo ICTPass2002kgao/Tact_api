@@ -21,14 +21,14 @@ def extract_audio(request):
                 destination.write(chunk)
  
         audio_filename = f"audio_{uuid.uuid4()}.mp3"
-        audio_path = os.path.join(settings.MEDIA_ROOT, 'audios', audio_filename)
+        audio_path = os.path.join(settings.MEDIA_ROOT, 'audio', audio_filename)
 
         clip = VideoFileClip(temp_video_path)
         clip.audio.write_audiofile(audio_path)
  
         os.remove(temp_video_path)
  
-        audio_record = Product.objects.create(audio=f'audios/{audio_filename}')
+        audio_record = Product.objects.create(audio=f'audio/{audio_filename}')
 
         return Response({
             'audio': audio_record.audio.url

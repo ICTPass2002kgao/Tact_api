@@ -122,6 +122,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = '/audio/'
 MEDIAL_ROOT = BASE_DIR / 'audio'
+# settings.py
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 100  # 100MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 100  # 100MB
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
